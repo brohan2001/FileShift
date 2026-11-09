@@ -1,0 +1,37 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test
+        run: swift test
+      - name: Build universal app
+        run: UNIVERSAL=1 scripts/build-app.sh
+      - name: Package
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME}"
+          STAGE="dist/FileShift"
+          mkdir -p "$STAGE/build" "$STAGE/scripts" "$STAGE/Resources"
+          cp -R build/FileShift.app "$STAGE/build/"
+          cp scripts/install.sh scripts/uninstall.sh "$STAGE/scripts/"
+          cp Resources/*.plist.template "$STAGE/Resources/"
+          cp install.sh uninstall.sh README.md LICENSE "$STAGE/"
+          cp "Install FileShift.command" "Uninstall FileShift.command" "$STAGE/"
+          (cd dist && ditto -c -k --keepParent FileShift "FileShift-${VERSION}-macOS.zip")
+          shasum -a 256 "dist/FileShift-${VERSION}-macOS.zip" | tee "dist/FileShift-${VERSION}-macOS.zip.sha256"
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.zip dist/*.sha256 \
+            --title "FileShift $GITHUB_REF_NAME" --generate-notes

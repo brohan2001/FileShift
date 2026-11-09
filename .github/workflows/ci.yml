@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: Build & test
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: swift --version
+      - name: Build
+        run: swift build
+      - name: Unit & integration tests
+        run: swift test
+      - name: Build app bundle (universal)
+        run: UNIVERSAL=1 scripts/build-app.sh
+
+  firefox-e2e:
+    name: End-to-end (real headless Firefox)
+    runs-on: macos-15
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Firefox end-to-end test
+        run: Tests/e2e/firefox-e2e.sh
