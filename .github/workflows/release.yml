@@ -28,7 +28,7 @@ jobs:
           cp install.sh uninstall.sh README.md LICENSE "$STAGE/"
           cp "Install FileShift.command" "Uninstall FileShift.command" "$STAGE/"
           (cd dist && ditto -c -k --keepParent FileShift "FileShift-${VERSION}-macOS.zip")
-          shasum -a 256 "dist/FileShift-${VERSION}-macOS.zip" | tee "dist/FileShift-${VERSION}-macOS.zip.sha256"
+          (cd dist && shasum -a 256 "FileShift-${VERSION}-macOS.zip" | tee "FileShift-${VERSION}-macOS.zip.sha256")
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
