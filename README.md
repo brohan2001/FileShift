@@ -97,6 +97,7 @@ Icon states: ⟳ monitoring · ⏸ paused · ⚠︎ something needs your attenti
 FileShift does nothing while any of these is true:
 - the file has a temporary extension (`.part`, `.crdownload`, `.download`, `.tmp`, `.partial`, `.opdownload`)
 - the final name has a companion such as `report(1).pdf.part`. This is how Firefox works: an empty placeholder sits next to a `.part` file, and the `.part` file replaces the placeholder when the download is done.
+- the file is empty. Firefox's placeholder is a 0-byte file, and its data may be written to a temp file with a different name (or outside the folder), so an empty duplicate is never treated as a finished download
 - the file's size or modification time changed within the last ~3 seconds
 
 ## Safety design
@@ -189,6 +190,7 @@ The tests never use your real Downloads folder: the test sandbox refuses to run 
    - its name looks like a browser duplicate (`name(N).ext` or `name (N).ext`)
    - an earlier version exists
    - it has no `.part`/`.crdownload`/`.download` companion
+   - it is not empty (an empty file is a browser placeholder)
    - its size and modification time have stayed the same for three samples
 3. **Plan.** It finds the unbroken run of existing versions starting at the clean name, and checks the whole rename sequence against the folder listing before touching anything.
 4. **Journal, then rename.** It saves the plan durably, then performs `renamex_np(RENAME_EXCL)` renames with an inode check before each one and a directory `fsync` after. Finally it removes the journal entry.

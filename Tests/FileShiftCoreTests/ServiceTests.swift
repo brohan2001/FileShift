@@ -126,6 +126,32 @@ final class ServiceTests: XCTestCase {
         assertState(sb, ["report.pdf": newSha, "report(1).pdf": v0])
     }
 
+    /// Firefox on macOS may write the data to a randomly named temp file (or outside the folder),
+    /// so the 0-byte placeholder at the final name has no `<name>.part` companion for a while.
+    /// The placeholder must never be versioned (regression: CI E2E left an empty report(1).pdf).
+    func test10_placeholderWithoutCompanionNotVersioned() {
+        let v0 = sb.create("report.pdf")
+        startService()
+        let final = sb.path("report(1).pdf"), part = sb.path("Xk3fQ9aZ.pdf.part")
+        FileManager.default.createFile(atPath: final, contents: Data())
+        FileManager.default.createFile(atPath: part, contents: Data())
+        let fh = FileHandle(forWritingAtPath: part)!
+        var all = Data()
+        // ~1.5 s: five times the 0.3 s stability window.
+        for i in 0..<15 {
+            let c = "chunk \(i) \(UUID().uuidString)\n".data(using: .utf8)!
+            fh.write(c); all.append(c)
+            Thread.sleep(forTimeInterval: 0.1)
+            XCTAssertEqual(sb.snapshot()["report.pdf"], v0, "empty placeholder was versioned (i=\(i))")
+        }
+        try! fh.close()
+        XCTAssertEqual(rename(part, final), 0)
+        XCTAssertTrue(waitUntil { self.sb.snapshot()["report.pdf"] == Sandbox.sha(all) })
+        Thread.sleep(forTimeInterval: 0.5)
+        assertState(sb, ["report.pdf": Sandbox.sha(all), "report(1).pdf": v0])
+        XCTAssertEqual(service.committedCount, 1)
+    }
+
     func test10_slowWriterWithoutTempFileWaitsForStability() {
         let v0 = sb.create("data.bin")
         startService()

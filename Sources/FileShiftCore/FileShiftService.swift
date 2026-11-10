@@ -15,6 +15,10 @@ public final class FileShiftService {
         public var debounce: TimeInterval = 0.3
         /// Give up on a candidate that never settles after this long.
         public var maxPendingAge: TimeInterval = 24 * 3600
+        /// An empty file is treated as a browser placeholder (Firefox creates a 0-byte file at
+        /// the final name while the data goes to a separately named temp file) and is never
+        /// versioned. After this long it is left alone for good.
+        public var emptyFileGiveUp: TimeInterval = 600
         /// Retry interval after a permission error.
         public var permissionRetry: TimeInterval = 15
 
@@ -282,7 +286,16 @@ public final class FileShiftService {
                 scheduleScan()
                 continue
             }
-            if DownloadRules.hasTemporarySibling(c.name, in: config.directory) {
+            if st.size == 0 {
+                // Placeholder: the real data arrives later under a new inode, which drops this candidate.
+                c.stableCount = 0
+                if now.timeIntervalSince(c.firstSeen) > config.emptyFileGiveUp {
+                    log.info("Leaving empty file \(c.name) alone")
+                    known.insert(inode)
+                    pending.removeValue(forKey: inode)
+                    continue
+                }
+            } else if DownloadRules.hasTemporarySibling(c.name, in: config.directory) {
                 c.stableCount = 0
             } else if st.sameContentSignature(as: c.stat) {
                 c.stableCount += 1
